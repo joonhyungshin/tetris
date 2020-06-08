@@ -91,7 +91,6 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, val cou
             "hardDrop" -> board.hardDrop()
             "surrender" -> board.surrender()
             "ready" -> setReady(board)
-            "reset" -> reset()
         }
     }
 
@@ -110,6 +109,7 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, val cou
             "home" -> tetrisUsers[webSocketSession] = UserType.HOME
             "away" -> tetrisUsers[webSocketSession] = UserType.AWAY
             "spectator" -> tetrisUsers[webSocketSession] = UserType.SPECTATOR
+            "reset" -> reset()
             else -> when (tetrisUsers[webSocketSession]) {
                 UserType.HOME -> handleAction(homeBoard, action)
                 UserType.AWAY -> handleAction(awayBoard, action)
