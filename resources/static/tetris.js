@@ -471,7 +471,9 @@ function connect() {
     // The socket will be connected automatically asap. Not now but after returning to the event loop,
     // so we can register handlers safely before the connection is performed.
     console.log("Begin connect");
-    socket = new WebSocket("wss://" + window.location.host + "/tetris");
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws"
+    socket = new WebSocket(protocol + "://" + window.location.host + "/tetris");
 
     // We set a handler that will be executed if the socket has any kind of unexpected error.
     // Since this is a just sample, we only report it at the console instead of making more complex things.
