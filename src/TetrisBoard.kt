@@ -12,7 +12,7 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
                   val knockoutLimit: Int = 3,
                   val knockoutTimeout: Long = 500L,
                   val softDropTimeout: Long = 1000L,
-                  val hardDropTimeout: Long = 500L) {
+                  val hardDropTimeout: Long = 700L) {
     enum class Cell(val code: Int) {
         EMPTY(0),
         TRASH(1),
@@ -161,6 +161,7 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
     private fun startDrop() {
         if (isKO()) {
             numKnockouts++
+            messageChannel.offer(TetrisMessage.Knockout(numKnockouts))
             if (numKnockouts >= knockoutLimit || trashLines == 0) {
                 return cleanUp()
             }
@@ -170,7 +171,6 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
                 mutex.withLock {
                     removeTrashLines(trashLines)
                     gameState = GameState.RUNNING
-                    messageChannel.offer(TetrisMessage.Knockout(numKnockouts))
                     startDrop()
                 }
             }
@@ -411,7 +411,7 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
         if (gameState == GameState.RUNNING && !onGround()) {
             currentPosition += Position(0, -1)
             lastMoveRotation = TRotation.NONE
-            if (!checkLockDown(moved = true)) runGravity()
+            if (!checkLockDown(moved = false)) runGravity()
             messageChannel.offer(TetrisMessage.Move(currentBlock.copyOf(), currentPosition))
         }
     }
@@ -535,7 +535,7 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
             val message = TetrisMessage.Board(copyBoard(), queue.getPreviewArray(),
                                               heldBlock?.copyOf(), currentBlock.copyOf(),
                                               currentPosition, trashLines, totalTrashSent,
-                                              gameState)
+                                              numKnockouts, gameState)
             message.recipient = recipient
             messageChannel.offer(message)
         }

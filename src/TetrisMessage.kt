@@ -36,7 +36,7 @@ sealed class TetrisMessage {
     data class Board(val board: Array<IntArray>, val queue: ArrayList<Tetromino>,
                      val heldBlock: Tetromino?, val block: Tetromino,
                      val position: Position, val trashLines: Int, val trashSent: Int,
-                     val gameState: TetrisBoard.GameState
+                     val knockoutCount: Int, val gameState: TetrisBoard.GameState
     ) : TetrisMessage()
 
     @Serializable

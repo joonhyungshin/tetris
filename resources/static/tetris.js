@@ -12,7 +12,8 @@ const colorMap = {
     "trash": "lightgray",
     "blankCell": "#999",
     "blankQueue": "black",
-    "blankHold": "black"
+    "blankHold": "black",
+    "preview": "#777",
 };
 
 const cellMap = {
@@ -27,9 +28,37 @@ const cellMap = {
     8: "xyz.joonhyung.tetris.blocks.TetrominoZ"
 }
 
+const keyMap = {
+    "ArrowLeft": "left",
+    "ArrowRight": "right",
+    "ArrowUp": "rotateRight",
+    "ArrowDown": "softDrop",
+    "Space": "hardDrop",
+    "ControlLeft": "rotateLeft",
+    "ShiftLeft": "hold"
+}
+
+const pressTimer = {}
+
+const buttonMap = {
+    "left": "left",
+    "right": "right",
+    "rotate-right": "rotateRight",
+    "soft-drop": "softDrop",
+    "hard-drop": "hardDrop",
+    "rotate-left": "rotateLeft",
+    "hold": "hold"
+}
+
+let pressedKey = new Set();
+
 let knockout = {
     "home": 0,
     "away": 0
+}
+let boardState = {
+    "home": "READY",
+    "away": "READY",
 }
 let lineSent = {
     "home": 0,
@@ -87,6 +116,14 @@ function initQueue(team) {
     }
 }
 
+function setLineSent(team) {
+    document.getElementById(team + "-sent").innerHTML = lineSent[team];
+}
+
+function setKnockout(team) {
+    document.getElementById(team + "-ko").innerHTML = knockout[team];
+}
+
 function initGame(team) {
     initBoard(team);
     initHold(team);
@@ -97,6 +134,9 @@ function initGame(team) {
     currentBlock[team] = null;
     queuedTrash[team] = 0;
     stackedTrash[team] = 0;
+    boardState[team] = "READY";
+    setLineSent(team);
+    setKnockout(team);
 }
 
 function setCell(team, i, j, cell) {
@@ -185,6 +225,42 @@ function hideCurrentBlock(team) {
     for (const relPos of posMap[block.type][block.rotateIndex]) {
         const pos = add(position, relPos);
         if (isValid(pos.x, pos.y)) setCell(team, pos.x, pos.y, "blankCell");
+    }
+}
+
+function isAvailable(team, downY) {
+    const block = currentBlock[team];
+    const position = currentPosition[team];
+    for (const relPos of posMap[block.type][block.rotateIndex]) {
+        const pos = add(position, relPos);
+        if (pos.y - downY < 0 || board[team][pos.x][pos.y - downY] !== "blankCell") {
+            return false;
+        }
+    }
+    return true;
+}
+
+function showPreview(team) {
+    const block = currentBlock[team];
+    const position = currentPosition[team];
+    if (block == null || position == null) return;
+    let downY = 0;
+    while (isAvailable(team, downY + 1)) downY++;
+    for (const relPos of posMap[block.type][block.rotateIndex]) {
+        const pos = add(position, relPos);
+        if (isValid(pos.x, pos.y - downY)) setCell(team, pos.x, pos.y - downY, "preview");
+    }
+}
+
+function hidePreview(team) {
+    const block = currentBlock[team];
+    const position = currentPosition[team];
+    if (block == null || position == null) return;
+    let downY = 0;
+    while (isAvailable(team, downY + 1)) downY++;
+    for (const relPos of posMap[block.type][block.rotateIndex]) {
+        const pos = add(position, relPos);
+        if (isValid(pos.x, pos.y - downY)) setCell(team, pos.x, pos.y - downY, "blankCell");
     }
 }
 
@@ -285,14 +361,21 @@ function handleReady(team, countDownMilis) {
 function handleStart(team, block, queue) {
     started = true;
     currentBlock[team] = block;
+    boardState[team] = "RUNNING";
     setupQueue(team, queue);
 }
 
 function handleMove(team, block, position) {
     if (started) {
+        if (boardState[team] === "KNOCKOUT") {
+            removeTrashLines(team, stackedTrash[team]);
+            boardState[team] = "RUNNING";
+        }
         hideCurrentBlock(team);
+        hidePreview(team);
         currentBlock[team] = block;
         currentPosition[team] = position;
+        showPreview(team);
         showCurrentBlock(team);
     }
 }
@@ -300,8 +383,10 @@ function handleMove(team, block, position) {
 function handleLockDown(team, block, position, newBlock, newQueuedBlock, trashSent) {
     if (started) {
         hideCurrentBlock(team);
+        hidePreview(team);
         lockDown(team, block, position);
         lineSent[team] += trashSent;
+        setLineSent(team);
         const compensatedTrash = min(trashSent, stackedTrash[team]);
         trashSent -= compensatedTrash;
         if (compensatedTrash > 0) removeTrashLines(team, compensatedTrash);
@@ -319,6 +404,7 @@ function handleLockDown(team, block, position, newBlock, newQueuedBlock, trashSe
 function handleHold(team, heldBlock, newBlock, noBlockHeld, lastQueuedBlock) {
     if (started) {
         hideCurrentBlock(team);
+        hidePreview(team);
         setupHold(team, heldBlock);
         if (noBlockHeld) pollAndPush(team, lastQueuedBlock);
         currentBlock[team] = newBlock;
@@ -331,20 +417,28 @@ function handleTrashReceived(team, numLines) {
 }
 
 function handleFinished(team, win) {
-    if (started && win) {
-        alert("Team " + team + " wins!");
+    if (started) {
+        boardState[team] = "FINISHED";
+        if (win) {
+            alert("Team " + team + " wins!");
+            started = false;
+        }
     }
 }
 
 function handleKnockout(team, knockoutCount) {
     if (started) {
-        // TODO: this should be moved to lockdown
         knockout[team] = knockoutCount;
-        removeTrashLines(team, stackedTrash[team]);
+        boardState[team] = "KNOCKOUT";
+        setKnockout(team);
+        // removeTrashLines(team, stackedTrash[team]);
     }
 }
 
-function handleBoard(team, board, queue, heldBlock, block, position, trashLines, trashSent, gameState) {
+function handleBoard(team, board, queue,
+                     heldBlock, block,
+                     position, trashLines, trashSent,
+                     knockoutCount, gameState) {
     initGame(team)
     setupBoard(team, board);
     setupQueue(team, queue);
@@ -353,8 +447,13 @@ function handleBoard(team, board, queue, heldBlock, block, position, trashLines,
     currentBlock[team] = block;
     currentPosition[team] = position;
     lineSent[team] = trashSent;
+    boardState[team] = gameState;
+    knockout[team] = knockoutCount;
     started = true;
-    showCurrentBlock(team)
+    showPreview(team);
+    showCurrentBlock(team);
+    setLineSent(team);
+    setKnockout(team);
 }
 
 function handleReset() {
@@ -443,8 +542,8 @@ function handleMessage(response) {
         case "xyz.joonhyung.tetris.TetrisMessage.Board":
             handleBoard(team, response.board, response.queue,
                         response.heldBlock, response.block,
-                        response.position, response.trashSent,
-                        response.gameState);
+                        response.position, response.trashLines, response.trashSent,
+                        response.knockoutCount, response.gameState);
             break;
         case "xyz.joonhyung.tetris.TetrisMessage.Reset":
             handleReset();
@@ -475,31 +574,32 @@ function start() {
     // First, we should connect to the server.
     connect();
 
-    document.getElementById("tetris").addEventListener("keydown", function(e) {
-        switch (e.code) {
-            case "ArrowLeft":
-                socket.send("left");
-                break;
-            case "ArrowRight":
-                socket.send("right");
-                break;
-            case "ArrowUp":
-                socket.send("rotateRight");
-                break;
-            case "ArrowDown":
-                socket.send("softDrop");
-                break;
-            case "Space":
-                socket.send("hardDrop");
-                break;
-            case "KeyZ":
-                socket.send("rotateLeft");
-                break;
-            case "ShiftLeft":
-                socket.send("hold");
-                break;
+    const isMove = function(code) {
+        return ["left", "right", "softDrop"].includes(keyMap[code]);
+    }
+
+    const fireMove = function(code) {
+        if (started) {
+            socket.send(keyMap[code]);
+            pressTimer[code] = setTimeout(fireMove, 40, code);
         }
-    });
+    }
+
+    document.getElementById("tetris").onkeydown = function(e) {
+        if (started && !e.repeat && keyMap[e.code]) {
+            socket.send(keyMap[e.code]);
+            pressTimer[e.code] = setTimeout(fireMove, 300, e.code);
+        }
+    };
+    window.onkeyup = function(e) {
+        clearTimeout(pressTimer[e.code]);
+    };
+    for (let [buttonId, action] of Object.entries(buttonMap)) {
+        document.getElementById(buttonId).onkeydown = function(e) {
+            keyMap[e.code] = action;
+            document.getElementById(buttonId).innerHTML = action + " - " + e.code;
+        }
+    }
     document.getElementById("home-ready").addEventListener("click", function(e) {
         socket.send("home");
         socket.send("ready");
@@ -538,6 +638,9 @@ function interfaceReady() {
         }
         if (!document.getElementById(team + "-ready")) return false;
     }
+    for (let buttonId of Object.keys(buttonMap)) {
+        if (!document.getElementById(buttonId)) return false;
+    }
     return document.getElementById("reset");
 }
 
@@ -555,4 +658,4 @@ function initLoop() {
 }
 
 // This is the entry point of the client.
-setTimeout(initLoop, 1000);
+initLoop();
