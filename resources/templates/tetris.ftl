@@ -71,6 +71,7 @@
 <body>
     <button id="home-ready">Home Ready</button>
     <button id="away-ready">Away Ready</button>
+    <button id="reset">Reset</button>
     <div class="tetris" id="tetris" tabindex="0">
         <div class="tetris-home">
             <div class="hold">

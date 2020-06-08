@@ -69,14 +69,34 @@ function initBoard(team) {
     }
 }
 
+function initHold(team) {
+    for (let x = 0; x < 4; x++) {
+        for (let y = 0; y < 4; y++) {
+            setHoldCell(team, x, y, "blankHold");
+        }
+    }
+}
+
+function initQueue(team) {
+    for (let i = 0; i < 5; i++) {
+        for (let x = 0; x < 4; x++) {
+            for (let y = 0; y < 4; y++) {
+                setQueueCell(team, i, x, y, "blankQueue");
+            }
+        }
+    }
+}
+
 function initGame(team) {
-    initBoard(team)
-    knockout[team] = 0
-    lineSent[team] = 0
-    currentPosition[team] = null
-    currentBlock[team] = null
-    queuedTrash[team] = 0
-    stackedTrash[team] = 0
+    initBoard(team);
+    initHold(team);
+    initQueue(team);
+    knockout[team] = 0;
+    lineSent[team] = 0;
+    currentPosition[team] = null;
+    currentBlock[team] = null;
+    queuedTrash[team] = 0;
+    stackedTrash[team] = 0;
 }
 
 function setCell(team, i, j, cell) {
@@ -337,6 +357,13 @@ function handleBoard(team, board, queue, heldBlock, block, position, trashLines,
     showCurrentBlock(team)
 }
 
+function handleReset() {
+    initGame("home");
+    initGame("away");
+    document.getElementById("home-ready").removeAttribute("disabled");
+    document.getElementById("away-ready").removeAttribute("disabled");
+}
+
 /**
  * This function is in charge of connecting the client.
  */
@@ -386,38 +413,41 @@ function connect() {
 function handleMessage(response) {
     const team = response.boardName;
     switch (response.type) {
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.Ready":
+        case "xyz.joonhyung.tetris.TetrisMessage.Ready":
             handleReady(team, response.countDownMilis);
             break;
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.Start":
+        case "xyz.joonhyung.tetris.TetrisMessage.Start":
             handleStart(team, response.block, response.queue);
             break;
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.Move":
+        case "xyz.joonhyung.tetris.TetrisMessage.Move":
             handleMove(team, response.block, response.position);
             break;
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.LockDown":
+        case "xyz.joonhyung.tetris.TetrisMessage.LockDown":
             handleLockDown(team, response.block, response.position,
                            response.newBlock, response.newQueuedBlock,
                            response.trashSent);
             break;
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.Hold":
+        case "xyz.joonhyung.tetris.TetrisMessage.Hold":
             handleHold(team, response.heldBlock, response.newBlock,
                        response.noBlockHeld, response.lastQueuedBlock);
             break;
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.TrashReceived":
+        case "xyz.joonhyung.tetris.TetrisMessage.TrashReceived":
             handleTrashReceived(team, response.numLines);
             break;
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.Finished":
+        case "xyz.joonhyung.tetris.TetrisMessage.Finished":
             handleFinished(team, response.win);
             break;
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.Knockout":
+        case "xyz.joonhyung.tetris.TetrisMessage.Knockout":
             handleKnockout(team, response.knockoutCount);
             break;
-        case "xyz.joonhyung.tetris.TetrisBoard.Message.Board":
+        case "xyz.joonhyung.tetris.TetrisMessage.Board":
             handleBoard(team, response.board, response.queue,
                         response.heldBlock, response.block,
                         response.position, response.trashSent,
                         response.gameState);
+            break;
+        case "xyz.joonhyung.tetris.TetrisMessage.Reset":
+            handleReset();
             break;
         default:
             console.log(response.type);
@@ -435,45 +465,6 @@ function received(message) {
         handleMessage(jsonResponse)
     } catch (e) {
         console.log(e)
-    }
-}
-
-/**
- * Writes a message in the HTML 'messages' container that the user can see.
- *
- * @param message The message to write in the container
- */
-function write(message) {
-    // We first create an HTML paragraph and sets its class and contents.
-    // Since we are using the textContent property.
-    // No HTML is processed and every html-related character is escaped property. So this should be safe.
-    var line = document.createElement("p");
-    line.className = "message";
-    line.textContent = message;
-
-    // Then we get the 'messages' container that should be available in the HTML itself already.
-    var messagesDiv = document.getElementById("messages");
-    // We adds the text
-    messagesDiv.appendChild(line);
-    // We scroll the container to where this text is so the use can see it on long conversations if he/she has scrolled up.
-    messagesDiv.scrollTop = line.offsetTop;
-}
-
-/**
- * Function in charge of sending the 'commandInput' text to the server via the socket.
- */
-function onSend() {
-    var input = document.getElementById("commandInput");
-    // Validates that the input exists
-    if (input) {
-        var text = input.value;
-        // Validates that there is a text and that the socket exists
-        if (text && socket) {
-            // Sends the text
-            socket.send(text);
-            // Clears the input so the user can type a new command or text to say
-            input.value = "";
-        }
     }
 }
 
@@ -521,6 +512,9 @@ function start() {
         document.getElementById("home-ready").setAttribute("disabled", "disabled");
         document.getElementById("away-ready").setAttribute("disabled", "disabled");
     });
+    document.getElementById("reset").addEventListener("click", function(e) {
+        socket.send("reset");
+    })
 }
 
 function interfaceReady() {
@@ -544,7 +538,7 @@ function interfaceReady() {
         }
         if (!document.getElementById(team + "-ready")) return false;
     }
-    return true;
+    return document.getElementById("reset");
 }
 
 /**

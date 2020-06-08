@@ -36,6 +36,13 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, val cou
         }
     }
 
+    suspend fun sendMessage(message: TetrisMessage) {
+        val json = Json(JsonConfiguration.Stable)
+        val jsonString = json.stringify(TetrisMessage.serializer(), message)
+        if (message.recipient == null) tetrisUsers.send(Frame.Text(jsonString))
+        else message.recipient!!.send(Frame.Text(jsonString))
+    }
+
     private suspend fun reset() {
         if (finished.compareAndSet(true, false)) {
             homeIsReady.set(false)
@@ -44,7 +51,7 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, val cou
             awayBoard.close()
             homeBoard = TetrisBoard(coroutineScope, this)
             awayBoard = TetrisBoard(coroutineScope, this)
-            tetrisUsers.send(Frame.Text(resetMessage))
+            sendMessage(TetrisMessage.Reset())
         }
     }
 
@@ -59,10 +66,7 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, val cou
     suspend fun sendToClient(board: TetrisBoard) {
         for (message in board.messageChannel) {
             message.boardName = board.getName()
-            val json = Json(JsonConfiguration.Stable)
-            val jsonString = json.stringify(TetrisBoard.Message.serializer(), message)
-            if (message.recipient == null) tetrisUsers.send(Frame.Text(jsonString))
-            else message.recipient!!.send(Frame.Text(jsonString))
+            sendMessage(message)
         }
     }
 
