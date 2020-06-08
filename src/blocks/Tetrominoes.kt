@@ -19,6 +19,7 @@ sealed class Tetromino {
     abstract fun getPositions(index: Int? = null): Array<Position>
     abstract fun getLeftRotationCandidates(): Array<Position>
     abstract fun getRightRotationCandidates(): Array<Position>
+    abstract fun copyOf(): Tetromino
     fun rotateLeft(dryRun: Boolean = false): Array<Position> {
         val nextIndex = (rotateIndex + 3) % 4
         if (!dryRun) rotateIndex = nextIndex
@@ -66,6 +67,11 @@ class TetrominoL : Tetromino() {
     override fun getPositions(index: Int?): Array<Position> { return positions[index ?: rotateIndex] }
     override fun getLeftRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][0] }
     override fun getRightRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][1] }
+    override fun copyOf(): TetrominoL {
+        val tetromino = TetrominoL()
+        tetromino.rotateIndex = rotateIndex
+        return tetromino
+    }
 }
 @Serializable
 class TetrominoJ : Tetromino() {
@@ -102,6 +108,11 @@ class TetrominoJ : Tetromino() {
     override fun getPositions(index: Int?): Array<Position> { return positions[index ?: rotateIndex] }
     override fun getLeftRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][0] }
     override fun getRightRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][1] }
+    override fun copyOf(): TetrominoJ {
+        val tetromino = TetrominoJ()
+        tetromino.rotateIndex = rotateIndex
+        return tetromino
+    }
 }
 @Serializable
 class TetrominoI : Tetromino() {
@@ -138,6 +149,11 @@ class TetrominoI : Tetromino() {
     override fun getPositions(index: Int?): Array<Position> { return positions[index ?: rotateIndex] }
     override fun getLeftRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][0] }
     override fun getRightRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][1] }
+    override fun copyOf(): TetrominoI {
+        val tetromino = TetrominoI()
+        tetromino.rotateIndex = rotateIndex
+        return tetromino
+    }
 }
 @Serializable
 class TetrominoO : Tetromino() {
@@ -173,6 +189,11 @@ class TetrominoO : Tetromino() {
     override fun getPositions(index: Int?): Array<Position> { return positions[index ?: rotateIndex] }
     override fun getLeftRotationCandidates(): Array<Position> { return arrayOf(Position(0, 0)) }
     override fun getRightRotationCandidates(): Array<Position> { return arrayOf(Position(0, 0)) }
+    override fun copyOf(): TetrominoO {
+        val tetromino = TetrominoO()
+        tetromino.rotateIndex = rotateIndex
+        return tetromino
+    }
 }
 @Serializable
 class TetrominoT : Tetromino() {
@@ -209,6 +230,11 @@ class TetrominoT : Tetromino() {
     override fun getPositions(index: Int?): Array<Position> { return positions[index ?: rotateIndex] }
     override fun getLeftRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][0] }
     override fun getRightRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][1] }
+    override fun copyOf(): TetrominoT {
+        val tetromino = TetrominoT()
+        tetromino.rotateIndex = rotateIndex
+        return tetromino
+    }
     fun getPointingPosition(): Position { return positions[rotateIndex][2] }
 }
 @Serializable
@@ -246,6 +272,11 @@ class TetrominoS : Tetromino() {
     override fun getPositions(index: Int?): Array<Position> { return positions[index ?: rotateIndex] }
     override fun getLeftRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][0] }
     override fun getRightRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][1] }
+    override fun copyOf(): TetrominoS {
+        val tetromino = TetrominoS()
+        tetromino.rotateIndex = rotateIndex
+        return tetromino
+    }
 }
 @Serializable
 class TetrominoZ : Tetromino() {
@@ -282,4 +313,9 @@ class TetrominoZ : Tetromino() {
     override fun getPositions(index: Int?): Array<Position> { return positions[index ?: rotateIndex] }
     override fun getLeftRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][0] }
     override fun getRightRotationCandidates(): Array<Position> { return rotationPositions[rotateIndex][1] }
+    override fun copyOf(): TetrominoZ {
+        val tetromino = TetrominoZ()
+        tetromino.rotateIndex = rotateIndex
+        return tetromino
+    }
 }
