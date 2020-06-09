@@ -577,7 +577,7 @@ function start() {
     connect();
 
     const isMove = function(code) {
-        return ["left", "right", "softDrop"].includes(keyMap[code]);
+        return ["left", "right"].includes(keyMap[code]);
     }
 
     const fireMove = function(code) {
@@ -590,7 +590,11 @@ function start() {
     document.getElementById("tetris").onkeydown = function(e) {
         if (started && !e.repeat && keyMap[e.code]) {
             socket.send(keyMap[e.code]);
-            clearTimeout(pressTimer[e.code]);
+            if (isMove(e.code)) {
+                for (const [code, timer] of Object.entries(pressTimer)) {
+                    if (isMove(code)) clearTimeout(timer);
+                }
+            } else clearTimeout(pressTimer[e.code]);
             pressTimer[e.code] = setTimeout(fireMove, 300, e.code);
         }
     };
