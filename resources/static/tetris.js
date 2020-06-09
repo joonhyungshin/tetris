@@ -596,6 +596,7 @@ function start() {
                 }
             } else clearTimeout(pressTimer[e.code]);
             pressTimer[e.code] = setTimeout(fireMove, 300, e.code);
+            e.preventDefault()
         }
     };
     window.onkeyup = function(e) {
