@@ -243,7 +243,7 @@ function isAvailable(team, downY) {
 function showPreview(team) {
     const block = currentBlock[team];
     const position = currentPosition[team];
-    if (block == null || position == null) return;
+    if (block == null || position == null || !isAvailable(team)) return;
     let downY = 0;
     while (isAvailable(team, downY + 1)) downY++;
     for (const relPos of posMap[block.type][block.rotateIndex]) {
@@ -590,6 +590,7 @@ function start() {
     document.getElementById("tetris").onkeydown = function(e) {
         if (started && !e.repeat && keyMap[e.code]) {
             socket.send(keyMap[e.code]);
+            clearTimeout(pressTimer[e.code]);
             pressTimer[e.code] = setTimeout(fireMove, 300, e.code);
         }
     };
