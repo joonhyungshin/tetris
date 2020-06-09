@@ -361,9 +361,9 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
         return false
     }
 
-    private fun moveTo(position: Position) {
-        val onGroundBefore = onGround()
+    private fun moveTo(position: Position, onGroundBefore: Boolean) {
         currentPosition = position
+        messageChannel.offer(TetrisMessage.Move(currentBlock.copyOf(), currentPosition))
         if (!checkLockDown(moved = true)) {
             val onGroundNow = onGround()
             if (onGroundBefore && !onGroundNow) {
@@ -372,12 +372,11 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
                 resetHardDropTimer()
             }
         }
-        messageChannel.offer(TetrisMessage.Move(currentBlock.copyOf(), currentPosition))
     }
 
     private fun tryMoveTo(position: Position): Boolean {
         if (moveAvailable(position)) {
-            moveTo(position)
+            moveTo(position, onGroundBefore = onGround())
             return true
         }
         return false
@@ -411,8 +410,8 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
         if (gameState == GameState.RUNNING && !onGround()) {
             currentPosition += Position(0, -1)
             lastMoveRotation = TRotation.NONE
-            if (!checkLockDown(moved = false)) runGravity()
             messageChannel.offer(TetrisMessage.Move(currentBlock.copyOf(), currentPosition))
+            if (!checkLockDown(moved = false)) runGravity()
         }
     }
     suspend fun hardDrop() = mutex.withLock {
@@ -444,10 +443,11 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
             for (rotationCandidate in rotationCandidates) {
                 val newPosition = currentPosition + rotationCandidate
                 if (moveAvailable(newPosition, positions)) {
+                    val onGroundBefore = onGround()
                     currentBlock.rotateLeft(dryRun = false)
                     lastMoveRotation = if (rotationCandidate == Position(1, -2)) TRotation.TST
                     else TRotation.NORMAL
-                    moveTo(newPosition)
+                    moveTo(newPosition, onGroundBefore)
                     return
                 }
             }
@@ -460,10 +460,11 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
             for (rotationCandidate in rotationCandidates) {
                 val newPosition = currentPosition + rotationCandidate
                 if (moveAvailable(newPosition, positions)) {
+                    val onGroundBefore = onGround()
                     currentBlock.rotateRight(dryRun = false)
                     lastMoveRotation = if (rotationCandidate == Position(-1, -2)) TRotation.TST
                     else TRotation.NORMAL
-                    moveTo(newPosition)
+                    moveTo(newPosition, onGroundBefore)
                     return
                 }
             }
