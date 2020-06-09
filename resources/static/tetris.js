@@ -243,7 +243,7 @@ function isAvailable(team, downY) {
 function showPreview(team) {
     const block = currentBlock[team];
     const position = currentPosition[team];
-    if (block == null || position == null || !isAvailable(team)) return;
+    if (block == null || position == null || !isAvailable(team, 0)) return;
     let downY = 0;
     while (isAvailable(team, downY + 1)) downY++;
     for (const relPos of posMap[block.type][block.rotateIndex]) {
