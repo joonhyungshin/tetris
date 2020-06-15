@@ -3,59 +3,74 @@ package xyz.joonhyung.tetris
 import io.ktor.http.cio.websocket.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
+import kotlinx.coroutines.sync.*
 import kotlinx.serialization.json.*
 import java.util.concurrent.*
-import java.util.concurrent.atomic.*
 
-class TetrisBattleController(private val coroutineScope: CoroutineScope, val countDownMilis: Long = 3000) {
+class TetrisBattleController(private val coroutineScope: CoroutineScope, private val server: TetrisServer,
+                             val countDownMilis: Long = 3000) {
     var homeBoard = TetrisBoard(coroutineScope, this)
     var awayBoard = TetrisBoard(coroutineScope, this)
 
-    val resetMessage = "reset"
+    private val globalChannel = Channel<TetrisMessage>(Channel.UNLIMITED)
+    private val messageStream = ConcurrentHashMap<String, Channel<String>>()
 
-    enum class UserType {
-        HOME, AWAY, SPECTATOR
+    enum class BattleState {
+        UNREADY, READY, RUNNING, STOPPED, FINISHED, CLOSED, TERMINATED
     }
 
-    private val tetrisUsers = ConcurrentHashMap<WebSocketSession, UserType>()
-    private val homeIsReady = AtomicBoolean(false)
-    private val awayIsReady = AtomicBoolean(false)
-    private val finished = AtomicBoolean(false)
+    // This set of properties manage the state of the battle.
+    private val mutex = Mutex()
+    private val tetrisUsers = HashSet<String>()
+    private var homeUser: String? = null
+    private var awayUser: String? = null
+    private var homeIsReady = false
+    private var awayIsReady = false
+    private var state = BattleState.UNREADY
 
-    suspend fun ConcurrentHashMap<WebSocketSession, UserType>.send(frame: Frame) {
-        forEach {
-            try {
-                it.key.send(frame.copy())
-            } catch (t: Throwable) {
-                try {
-                    it.key.close(CloseReason(CloseReason.Codes.PROTOCOL_ERROR, ""))
-                } catch (ignore: ClosedSendChannelException) {
-                    // at some point it will get closed
-                }
+    init {
+        coroutineScope.launch {
+            for (message in globalChannel) {
+                sendMessage(message)
             }
         }
+        state = BattleState.READY
     }
 
-    suspend fun sendMessage(message: TetrisMessage) {
+    private fun sendMessage(message: TetrisMessage) {
         val json = Json(JsonConfiguration.Stable)
         val jsonString = json.stringify(TetrisMessage.serializer(), message)
-        if (message.recipient == null) tetrisUsers.send(Frame.Text(jsonString))
-        else message.recipient!!.send(Frame.Text(jsonString))
+        val recipient = message.recipient
+        if (recipient == null) {
+            messageStream.forEach {
+                it.value.offer(jsonString)
+            }
+        }
+        else messageStream[recipient]?.offer(jsonString)
     }
 
     private suspend fun reset() {
-        if (finished.compareAndSet(true, false)) {
-            homeIsReady.set(false)
-            awayIsReady.set(false)
-            homeBoard.close()
-            awayBoard.close()
-            homeBoard = TetrisBoard(coroutineScope, this)
-            awayBoard = TetrisBoard(coroutineScope, this)
-            sendMessage(TetrisMessage.Reset())
+        mutex.withLock {
+            if (state == BattleState.FINISHED) {
+                homeIsReady = false
+                awayIsReady = false
+                homeUser = null
+                awayUser = null
+                state = BattleState.CLOSED
+            } else return
+        }
+        // We want to avoid holding more than one lock.
+        homeBoard.close()
+        awayBoard.close()
+        homeBoard = TetrisBoard(coroutineScope, this)
+        awayBoard = TetrisBoard(coroutineScope, this)
+        sendMessage(TetrisMessage.Reset())
+        mutex.withLock {
+            state = BattleState.READY
         }
     }
 
-    fun TetrisBoard.getName(): String {
+    private fun TetrisBoard.getName(): String {
         return when (this) {
             homeBoard -> "home"
             awayBoard -> "away"
@@ -63,24 +78,56 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, val cou
         }
     }
 
-    suspend fun sendToClient(board: TetrisBoard) {
+    private suspend fun streamBoardMessage(board: TetrisBoard) {
         for (message in board.messageChannel) {
             message.boardName = board.getName()
             sendMessage(message)
         }
     }
 
-    private fun setReady(board: TetrisBoard) {
-        val effectiveReady = when (board) {
-            homeBoard -> homeIsReady.compareAndSet(false, true)
-            else -> awayIsReady.compareAndSet(false, true)
+    suspend fun start() = mutex.withLock {
+        if (state == BattleState.UNREADY) {
+            coroutineScope.launch {
+                for (message in globalChannel) {
+                    sendMessage(message)
+                }
+            }
+            state = BattleState.READY
         }
-        if (effectiveReady && homeIsReady.get() && awayIsReady.get()) {
+    }
+
+    suspend fun close() = mutex.withLock {
+        if (state == BattleState.FINISHED) {
+            state = BattleState.TERMINATED
+            globalChannel.close()
+        }
+    }
+
+    private fun setReadyState(board: TetrisBoard, ready: Boolean) {
+        when (board) {
+            homeBoard -> homeIsReady = ready
+            awayBoard -> awayIsReady = ready
+        }
+        sendBoardUserMessage(null)
+        if (homeIsReady && awayIsReady) {
+            state = BattleState.RUNNING
             readyAndStart()
         }
     }
 
-    private suspend fun handleAction(board: TetrisBoard, action: String) {
+    private suspend fun handleAction(member: String, action: String) {
+        val board = mutex.withLock {
+            val board = when (member) {
+                homeUser -> homeBoard
+                awayUser -> awayBoard
+                else -> return
+            }
+            if (action == "ready" || action == "unready") {
+                if (state == BattleState.READY) setReadyState(board, action == "ready")
+                return
+            }
+            return@withLock board
+        }
         when (action) {
             "left" -> board.moveLeft()
             "right" -> board.moveRight()
@@ -90,42 +137,92 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, val cou
             "softDrop" -> board.softDrop()
             "hardDrop" -> board.hardDrop()
             "surrender" -> board.surrender()
-            "ready" -> setReady(board)
         }
     }
 
-    suspend fun clientJoined(webSocketSession: WebSocketSession) {
-        tetrisUsers.computeIfAbsent(webSocketSession) { UserType.SPECTATOR }
-        homeBoard.sendGameIfStarted(webSocketSession)
-        awayBoard.sendGameIfStarted(webSocketSession)
+    suspend fun addUser(member: String) = mutex.withLock {
+        tetrisUsers.add(member)
     }
 
-    fun clientLeft(webSocketSession: WebSocketSession) {
-        tetrisUsers.remove(webSocketSession)
+    suspend fun removeUser(member: String) = mutex.withLock {
+        tetrisUsers.remove(member)
     }
 
-    suspend fun receiveFromClient(webSocketSession: WebSocketSession, action: String) {
-        when (action) {
-            "home" -> tetrisUsers[webSocketSession] = UserType.HOME
-            "away" -> tetrisUsers[webSocketSession] = UserType.AWAY
-            "spectator" -> tetrisUsers[webSocketSession] = UserType.SPECTATOR
-            "reset" -> reset()
-            else -> when (tetrisUsers[webSocketSession]) {
-                UserType.HOME -> handleAction(homeBoard, action)
-                UserType.AWAY -> handleAction(awayBoard, action)
-                else -> {
-                    // Do nothing
+    private fun getBoardUserMessage(): TetrisMessage.BoardUser {
+        return TetrisMessage.BoardUser(server.getMemberName(homeUser), homeIsReady,
+                                       server.getMemberName(awayUser), awayIsReady)
+    }
+
+    private fun sendBoardUserMessage(recipient: String?) {
+        val message = getBoardUserMessage()
+        message.recipient = recipient
+        globalChannel.offer(message)
+    }
+
+    suspend fun memberJoined(member: String) {
+        messageStream.computeIfAbsent(member) {
+            val stream = Channel<String>(Channel.UNLIMITED)
+            coroutineScope.launch {
+                // This coroutine terminates if the member leaves
+                for (message in stream) {
+                    server.send(member, Frame.Text(message))
                 }
             }
+            stream
+        }
+        addUser(member)
+        homeBoard.sendGameIfStarted(member)
+        awayBoard.sendGameIfStarted(member)
+        mutex.withLock {
+            sendBoardUserMessage(member)
         }
     }
 
-    fun readyAndStart() {
+    suspend fun memberLeft(member: String) {
+        setUserType(member, "spectator")
+        removeUser(member)
+        messageStream[member]?.close()
+        messageStream.remove(member)
+    }
+
+    suspend fun setUserType(member: String, type: String) = mutex.withLock {
+        if (state == BattleState.READY) {
+            when (type) {
+                "home" -> if (homeUser == null) {
+                    homeUser = member
+                }
+                "away" -> if (awayUser == null) {
+                    awayUser = member
+                }
+                else -> when (member) {
+                    homeUser -> {
+                        homeUser = null
+                        homeIsReady = false
+                    }
+                    awayUser -> {
+                        awayUser = null
+                        awayIsReady = false
+                    }
+                }
+            }
+            sendBoardUserMessage(null)
+        }
+    }
+
+    suspend fun receiveFromMember(member: String, action: String) {
+        when (action) {
+            "home", "away", "spectator" -> setUserType(member, action)
+            "reset" -> reset()
+            else -> handleAction(member, action)
+        }
+    }
+
+    private fun readyAndStart() {
         coroutineScope.launch {
-            sendToClient(homeBoard)
+            streamBoardMessage(homeBoard)
         }
         coroutineScope.launch {
-            sendToClient(awayBoard)
+            streamBoardMessage(awayBoard)
         }
         coroutineScope.launch {
             homeBoard.readyAndStart(countDownMilis)
@@ -148,14 +245,19 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, val cou
 
     fun gameOver(board: TetrisBoard) {
         coroutineScope.launch {
-            if (finished.compareAndSet(false, true)) {
-                // TODO: Notify that [board] is loser
-                val winnerBoard = when (board) {
-                    homeBoard -> awayBoard
-                    else -> homeBoard
-                }
-                board.gameOver(win = false)
-                winnerBoard.gameOver(win = true)
+            mutex.withLock {
+                if (state == BattleState.RUNNING) {
+                    state = BattleState.STOPPED
+                } else return@launch
+            }
+            val winnerBoard = when (board) {
+                homeBoard -> awayBoard
+                else -> homeBoard
+            }
+            board.gameOver(win = false)
+            winnerBoard.gameOver(win = true)
+            mutex.withLock {
+                state = BattleState.FINISHED
             }
         }
     }

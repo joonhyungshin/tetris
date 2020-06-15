@@ -1,6 +1,5 @@
 package xyz.joonhyung.tetris
 
-import io.ktor.http.cio.websocket.*
 import kotlin.math.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.*
@@ -36,7 +35,7 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
     }
 
     enum class GameState {
-        READY, RUNNING, KNOCKOUT, FINISHED, CLOSED
+        READY, RUNNING, STOPPED, KNOCKOUT, FINISHED, CLOSED
     }
 
     enum class TRotation {
@@ -45,10 +44,6 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
 
     enum class TSpinState {
         NONE, T_SPIN, T_SPIN_MINI
-    }
-
-    enum class BackToBackState {
-        NONE, T_SPIN, TETRIS
     }
 
     val messageChannel = Channel<TetrisMessage>(Channel.UNLIMITED)
@@ -91,7 +86,7 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
         private set
 
     var lastMoveRotation = TRotation.NONE
-    var backToBack: BackToBackState = BackToBackState.NONE
+    var backToBack = false
         private set
 
     private var numBlockCells: Int = 0
@@ -103,8 +98,6 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
 
     private fun cleanUp() {
         cancelDropTimers()
-        gameState = GameState.FINISHED
-        tetrisBattleController?.gameOver(this)
     }
 
     private fun resetSoftDropTimer() {
@@ -163,7 +156,10 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
             numKnockouts++
             messageChannel.offer(TetrisMessage.Knockout(numKnockouts))
             if (numKnockouts >= knockoutLimit || trashLines == 0) {
-                return cleanUp()
+                cleanUp()
+                gameState = GameState.STOPPED
+                tetrisBattleController?.gameOver(this)
+                return
             }
             gameState = GameState.KNOCKOUT
             coroutineScope.launch {
@@ -261,26 +257,23 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
             // Extra
             trashSent += when (numLines) {
                 1 -> when (tSpinState) {
-                    TSpinState.T_SPIN -> if (backToBack == BackToBackState.T_SPIN) 3 else 2
-                    TSpinState.T_SPIN_MINI -> if (backToBack == BackToBackState.T_SPIN) 2 else 1
+                    TSpinState.T_SPIN -> if (backToBack) 3 else 2
+                    TSpinState.T_SPIN_MINI -> if (backToBack) 2 else 1
                     else -> 0
                 }
                 2 -> when (tSpinState) {
                     TSpinState.NONE -> 1
-                    else -> if (backToBack == BackToBackState.T_SPIN) 6 else 4
+                    else -> if (backToBack) 6 else 4
                 }
                 3 -> when (tSpinState) {
                     TSpinState.NONE -> 2
-                    else -> if (backToBack == BackToBackState.T_SPIN) 9 else 6
+                    else -> if (backToBack) 9 else 6
                 }
-                4 -> if (backToBack == BackToBackState.TETRIS) 6 else 4
+                4 -> if (backToBack) 6 else 4
                 else -> 0
             }
 
-            backToBack = when (tSpinState) {
-                TSpinState.NONE -> if (numLines == 4) BackToBackState.TETRIS else BackToBackState.NONE
-                else -> BackToBackState.T_SPIN
-            }
+            backToBack = tSpinState != TSpinState.NONE || numLines == 4
         } else lineCombo = -1
 
         totalTrashSent += trashSent
@@ -492,12 +485,17 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
         }
     }
     suspend fun gameOver(win: Boolean = false) = mutex.withLock {
-        if (gameState == GameState.RUNNING) cleanUp()
-        messageChannel.offer(TetrisMessage.Finished(win))
+        if (gameState != GameState.FINISHED && gameState != GameState.CLOSED) {
+            cleanUp()
+            gameState = GameState.FINISHED
+            messageChannel.offer(TetrisMessage.Finished(win))
+        }
     }
     suspend fun surrender() = mutex.withLock {
-        if (gameState == GameState.RUNNING) {
+        if (gameState == GameState.RUNNING || gameState == GameState.KNOCKOUT) {
             cleanUp()
+            gameState = GameState.STOPPED
+            tetrisBattleController?.gameOver(this)
         }
     }
     suspend fun printBoard() = mutex.withLock {
@@ -527,7 +525,7 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
         }
     }
 
-    suspend fun sendGameIfStarted(recipient: WebSocketSession) = mutex.withLock {
+    suspend fun sendGameIfStarted(recipient: String) = mutex.withLock {
         /**
          * If the game state is [GameState.READY], we don't send the message simply because
          * we don't have to, and we shouldn't reveal the queue.
@@ -543,7 +541,9 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
     }
 
     suspend fun close() = mutex.withLock {
-        gameState = GameState.CLOSED
-        messageChannel.close()
+        if (gameState == GameState.FINISHED) {
+            gameState = GameState.CLOSED
+            messageChannel.close()
+        }
     }
 }

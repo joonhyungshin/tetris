@@ -22,7 +22,7 @@
             height: 120px;
             float: right;
             font-size: 60px;
-            color: red;
+            color: blue;
             text-align: center;
         }
         div.line-sent {
@@ -86,7 +86,7 @@
     <button id="rotate-right">rotateRight - ArrowUp</button>
     <button id="rotate-left">rotateLeft - ControlLeft</button>
     <button id="hold">hold - ShiftLeft</button>
-    <div class="tetris" id="tetris" tabindex="0">
+    <div class="tetris" id="tetris" tabindex="0" autofocus>
         <div class="tetris-home">
             <table class="queue">
                 <#list 0..4 as i>

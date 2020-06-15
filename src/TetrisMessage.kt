@@ -10,7 +10,7 @@ import xyz.joonhyung.tetris.blocks.Tetromino
 sealed class TetrisMessage {
     var boardName: String? = null
     @Transient
-    var recipient: WebSocketSession? = null
+    var recipient: String? = null
 
     @Serializable
     data class Ready(val countDownMilis: Long) : TetrisMessage()
@@ -40,5 +40,9 @@ sealed class TetrisMessage {
     ) : TetrisMessage()
 
     @Serializable
-    data class Reset(val dummy: Int = 0) : TetrisMessage()
+    class Reset : TetrisMessage()
+
+    @Serializable
+    data class BoardUser(val homeUser: String?, val homeIsReady: Boolean,
+                         val awayUser: String?, val awayIsReady: Boolean) : TetrisMessage()
 }

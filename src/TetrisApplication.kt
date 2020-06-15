@@ -24,7 +24,7 @@ class TetrisApplication(coroutineScope: CoroutineScope) {
     /**
      * This will later become a hash map.
      */
-    private var tetrisBattle = TetrisBattleController(coroutineScope)
+    private var tetrisServer = TetrisServer(coroutineScope)
 
     fun Application.main() {
         // This adds automatically Date and Server headers to each response, and would allow you to configure
@@ -78,7 +78,7 @@ class TetrisApplication(coroutineScope: CoroutineScope) {
 
                 // We notify that a member joined by calling the server handler [memberJoin]
                 // This allows to associate the session id to a specific WebSocket connection.
-                tetrisBattle.clientJoined(this)
+                tetrisServer.memberJoin(session.id, this)
 
                 try {
                     // We starts receiving messages (frames).
@@ -91,13 +91,13 @@ class TetrisApplication(coroutineScope: CoroutineScope) {
                             // Now it is time to process the text sent from the user.
                             // At this point we have context about this connection, the session, the text and the server.
                             // So we have everything we need.
-                            tetrisBattle.receiveFromClient(this, frame.readText())
+                            tetrisServer.receiveFromMember(session.id, frame.readText())
                         }
                     }
                 } finally {
                     // Either if there was an error, of it the connection was closed gracefully.
                     // We notify the server that the member left.
-                    tetrisBattle.clientLeft(this)
+                    tetrisServer.memberLeft(session.id, this)
                 }
             }
 

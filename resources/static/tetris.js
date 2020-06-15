@@ -121,7 +121,8 @@ function setLineSent(team) {
 }
 
 function setKnockout(team) {
-    document.getElementById(team + "-ko").innerHTML = knockout[team];
+    const otherTeam = (team === "home" ? "away" : "home");
+    document.getElementById(otherTeam + "-ko").innerHTML = knockout[team];
 }
 
 function initGame(team) {
@@ -243,7 +244,7 @@ function isAvailable(team, downY) {
 function showPreview(team) {
     const block = currentBlock[team];
     const position = currentPosition[team];
-    if (block == null || position == null || !isAvailable(team, 0)) return;
+    if (block == null || position == null) return;
     let downY = 0;
     while (isAvailable(team, downY + 1)) downY++;
     for (const relPos of posMap[block.type][block.rotateIndex]) {
@@ -267,7 +268,7 @@ function hidePreview(team) {
 function showCurrentBlock(team) {
     const block = currentBlock[team];
     const position = currentPosition[team];
-    if (block == null || position == null) return;
+    if (block == null || position == null || !isAvailable(team, 0)) return;
     for (const relPos of posMap[block.type][block.rotateIndex]) {
         const pos = add(position, relPos);
         if (isValid(pos.x, pos.y)) setCell(team, pos.x, pos.y, block.type);
@@ -463,6 +464,22 @@ function handleReset() {
     document.getElementById("away-ready").removeAttribute("disabled");
 }
 
+function handleBoardUser(homeUser, homeIsReady, awayUser, awayIsReady) {
+    // TODO
+    if (homeUser) {
+        document.getElementById("home-ready").setAttribute("disabled", "disabled");
+    } else {
+        document.getElementById("home-ready").removeAttribute("disabled");
+    }
+    if (awayUser) {
+        document.getElementById("away-ready").setAttribute("disabled", "disabled");
+    } else {
+        document.getElementById("away-ready").removeAttribute("disabled");
+    }
+    console.log(homeUser + ": " + homeIsReady)
+    console.log(awayUser + ": " + awayIsReady)
+}
+
 /**
  * This function is in charge of connecting the client.
  */
@@ -549,6 +566,10 @@ function handleMessage(response) {
             break;
         case "xyz.joonhyung.tetris.TetrisMessage.Reset":
             handleReset();
+            break;
+        case "xyz.joonhyung.tetris.TetrisMessage.BoardUser":
+            handleBoardUser(response.homeUser, response.homeIsReady,
+                            response.awayUser, response.awayIsReady);
             break;
         default:
             console.log(response.type);
