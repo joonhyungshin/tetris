@@ -492,7 +492,7 @@ class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
         }
     }
     suspend fun surrender() = mutex.withLock {
-        if (gameState == GameState.RUNNING || gameState == GameState.KNOCKOUT) {
+        if (gameState == GameState.READY || gameState == GameState.RUNNING || gameState == GameState.KNOCKOUT) {
             cleanUp()
             gameState = GameState.STOPPED
             tetrisBattleController?.gameOver(this)

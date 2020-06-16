@@ -635,14 +635,10 @@ function start() {
     document.getElementById("home-ready").addEventListener("click", function(e) {
         socket.send("home");
         socket.send("ready");
-        document.getElementById("home-ready").setAttribute("disabled", "disabled");
-        document.getElementById("away-ready").setAttribute("disabled", "disabled");
     });
     document.getElementById("away-ready").addEventListener("click", function(e) {
         socket.send("away");
         socket.send("ready");
-        document.getElementById("home-ready").setAttribute("disabled", "disabled");
-        document.getElementById("away-ready").setAttribute("disabled", "disabled");
     });
     document.getElementById("reset").addEventListener("click", function(e) {
         socket.send("reset");
