@@ -126,7 +126,7 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, private
                 if (state == BattleState.READY) setReadyState(board, action == "ready")
                 return
             }
-            return@withLock board
+            board
         }
         when (action) {
             "left" -> board.moveLeft()
@@ -185,28 +185,34 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, private
         messageStream.remove(member)
     }
 
-    suspend fun setUserType(member: String, type: String) = mutex.withLock {
-        if (state == BattleState.READY) {
-            when (member) {
-                homeUser -> {
-                    homeUser = null
-                    homeIsReady = false
-                }
-                awayUser -> {
-                    awayUser = null
-                    awayIsReady = false
-                }
+    private suspend fun setUserType(member: String, type: String) = mutex.withLock {
+        val board = when (member) {
+            homeUser -> {
+                homeUser = null
+                homeIsReady = false
+                homeBoard
             }
-            when (type) {
-                "home" -> if (homeUser == null) {
-                    homeUser = member
-                }
-                "away" -> if (awayUser == null) {
-                    awayUser = member
-                }
+            awayUser -> {
+                awayUser = null
+                awayIsReady = false
+                awayBoard
             }
-            sendBoardUserMessage(null)
+            else -> null
         }
+        if (state == BattleState.RUNNING) {
+            coroutineScope.launch {
+                board?.surrender()
+            }
+        }
+        when (type) {
+            "home" -> if (homeUser == null) {
+                homeUser = member
+            }
+            "away" -> if (awayUser == null) {
+                awayUser = member
+            }
+        }
+        sendBoardUserMessage(null)
     }
 
     suspend fun receiveFromMember(member: String, action: String) {
