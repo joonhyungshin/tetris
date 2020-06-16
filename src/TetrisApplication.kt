@@ -62,6 +62,11 @@ class TetrisApplication(coroutineScope: CoroutineScope) {
                 call.respond(FreeMarkerContent("tetris.ftl", null, ""))
             }
 
+            get("/error") {
+                val reason = call.request.queryParameters["reason"] ?: "unknown"
+                call.respond(FreeMarkerContent("error.ftl", mapOf("reason" to reason), ""))
+            }
+
             // This defines a websocket `/ws` route that allows a protocol upgrade to convert a HTTP request/response request
             // into a bidirectional packetized connection.
             webSocket("/tetris") { // this: WebSocketSession ->

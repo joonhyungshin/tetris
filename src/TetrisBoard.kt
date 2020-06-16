@@ -9,7 +9,7 @@ import xyz.joonhyung.tetris.blocks.*
 class TetrisBoard(private val coroutineScope: CoroutineScope = GlobalScope,
                   private val tetrisBattleController: TetrisBattleController? = null,
                   val knockoutLimit: Int = 3,
-                  val knockoutTimeout: Long = 500L,
+                  val knockoutTimeout: Long = 700L,
                   val softDropTimeout: Long = 1000L,
                   val hardDropTimeout: Long = 700L) {
     enum class Cell(val code: Int) {

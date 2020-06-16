@@ -370,6 +370,7 @@ function handleMove(team, block, position) {
     if (started) {
         if (boardState[team] === "KNOCKOUT") {
             removeTrashLines(team, stackedTrash[team]);
+            document.getElementById(team + "-knockout").style.visibility = "hidden";
             boardState[team] = "RUNNING";
         }
         hideCurrentBlock(team);
@@ -431,6 +432,7 @@ function handleKnockout(team, knockoutCount) {
     if (started) {
         knockout[team] = knockoutCount;
         boardState[team] = "KNOCKOUT";
+        document.getElementById(team + "-knockout").style.visibility = "visible";
         setKnockout(team);
         // removeTrashLines(team, stackedTrash[team]);
     }
@@ -462,10 +464,11 @@ function handleReset() {
     initGame("away");
     document.getElementById("home-ready").removeAttribute("disabled");
     document.getElementById("away-ready").removeAttribute("disabled");
+    document.getElementById("home-knockout").style.visibility = "hidden";
+    document.getElementById("away-knockout").style.visibility = "hidden";
 }
 
 function handleBoardUser(homeUser, homeIsReady, awayUser, awayIsReady) {
-    // TODO
     if (homeUser) {
         document.getElementById("home-ready").setAttribute("disabled", "disabled");
     } else {
@@ -476,8 +479,6 @@ function handleBoardUser(homeUser, homeIsReady, awayUser, awayIsReady) {
     } else {
         document.getElementById("away-ready").removeAttribute("disabled");
     }
-    console.log(homeUser + ": " + homeIsReady)
-    console.log(awayUser + ": " + awayIsReady)
 }
 
 /**
@@ -519,7 +520,9 @@ function connect() {
         // Notify the user using the messages container.
         // write("Disconnected with close code " + evt.code + " and " + explanation);
         // Try to reconnect after 5 seconds.
-        setTimeout(connect, 5000);
+        if (evt.code === 1008) {
+            location.href = "/error?reason=" + evt.reason;
+        } else setTimeout(connect, 5000);
     };
 
     // If we receive a message from the server, we want to handle it.
@@ -617,8 +620,8 @@ function start() {
                 }
             } else clearTimeout(pressTimer[e.code]);
             pressTimer[e.code] = setTimeout(fireMove, 300, e.code);
-            e.preventDefault()
         }
+        e.preventDefault()
     };
     window.onkeyup = function(e) {
         clearTimeout(pressTimer[e.code]);

@@ -7,37 +7,60 @@
     <style type="text/css">
         div.tetris {
             width: 1200px;
-            margin: auto;
+            height: 700px;
+            margin: 30px auto;
         }
         div.tetris-home {
             width: 560px;
+            height: 650px;
             float: left;
+            position: relative;
         }
         div.tetris-away {
             width: 560px;
+            height: 700px;
             float: right;
+            position: relative;
         }
         div.ko {
-            width: 120px;
-            height: 120px;
-            float: right;
+            width: 100px;
+            height: 100px;
             font-size: 60px;
             color: blue;
             text-align: center;
+            position: absolute;
+            top: 230px;
+            left: 20px;
         }
         div.line-sent {
-            margin: 20px auto;
-            width: 120px;
-            height: 120px;
-            float: right;
+            width: 100px;
+            height: 100px;
             font-size: 40px;
             text-align: center;
+            position: absolute;
+            top: 370px;
+            left: 20px;
+        }
+        div.knockout {
+            width: 360px;
+            height: 180px;
+            font-size: 70px;
+            font-weight: bold;
+            color: red;
+            text-align: center;
+            position:absolute;
+            top: 250px;
+            left: 100px;
+            z-index: 1;
+            visibility: hidden;
         }
         table.board {
-            margin: 80px 10px;
             border: 10px solid #333;
             border-collapse: collapse; /* */
-            float: right;
+            position: absolute;
+            top: 50px;
+            left: 135px;
+            z-index: 0;
         }
         td.board {
             width: 25px; height: 25px;
@@ -45,10 +68,11 @@
             border: 1px solid #333; /* */
         }
         table.hold {
-            margin: 80px auto;
             border: 5px solid #999;
             border-collapse: collapse;
-            float: right;
+            position: absolute;
+            top: 50px;
+            left: 20px;
         }
         td.hold {
             width: 20px; height: 20px;
@@ -56,10 +80,11 @@
             border: 1px solid black; /* */
         }
         table.queue {
-            margin: 80px auto;
             border: 5px solid #999;
             border-collapse: collapse;
-            float: right;
+            position: absolute;
+            top: 50px;
+            left: 445px;
         }
         tbody.queue {
             margin: auto;
@@ -131,6 +156,9 @@
             <div class="line-sent" id="home-sent">
                 0
             </div>
+            <div class="knockout" id="home-knockout">
+                KO!
+            </div>
         </div>
         <div class="tetris-away">
             <table class="queue">
@@ -175,6 +203,9 @@
             </div>
             <div class="line-sent" id="away-sent">
                 0
+            </div>
+            <div class="knockout" id="away-knockout">
+                KO!
             </div>
         </div>
     </div>
