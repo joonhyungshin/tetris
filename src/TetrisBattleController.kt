@@ -187,22 +187,22 @@ class TetrisBattleController(private val coroutineScope: CoroutineScope, private
 
     suspend fun setUserType(member: String, type: String) = mutex.withLock {
         if (state == BattleState.READY) {
+            when (member) {
+                homeUser -> {
+                    homeUser = null
+                    homeIsReady = false
+                }
+                awayUser -> {
+                    awayUser = null
+                    awayIsReady = false
+                }
+            }
             when (type) {
                 "home" -> if (homeUser == null) {
                     homeUser = member
                 }
                 "away" -> if (awayUser == null) {
                     awayUser = member
-                }
-                else -> when (member) {
-                    homeUser -> {
-                        homeUser = null
-                        homeIsReady = false
-                    }
-                    awayUser -> {
-                        awayUser = null
-                        awayIsReady = false
-                    }
                 }
             }
             sendBoardUserMessage(null)
